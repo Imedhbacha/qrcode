@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+    <meta charset="utf-8">
+    <title>Pro QR Code Generator 2026</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Poppins', sans-serif; }
+        body {
+            display: flex; padding: 10px; min-height: 100vh;
+            align-items: center; justify-content: center;
+            background: linear-gradient(135deg, #1e3c72, #2a5298);
+        }
+        .wrapper {
+            width: 100%; max-width: 400px; background: #fff;
+            border-radius: 20px; padding: 25px;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.3);
+            text-align: center;
+            max-height: 95vh; overflow-y: auto;
+        }
+        header h1 { font-size: 22px; margin-bottom: 5px; color: #333; font-weight: 600;}
+        header p { font-size: 14px; color: #666; margin-bottom: 20px;}
+        .form input {
+            width: 100%; height: 50px; border: 2px solid #eee;
+            border-radius: 10px; padding: 0 15px; font-size: 16px;
+            margin-bottom: 15px; outline: none; transition: 0.3s;
+        }
+        .form input:focus { border-color: #1e3c72; }
+        .form button {
+            width: 100%; height: 50px; border: none; border-radius: 10px;
+            color: #fff; background: #1e3c72; font-size: 18px; font-weight: 600;
+            cursor: pointer; transition: 0.2s;
+        }
+        .form button:active { transform: scale(0.98); }
+        .qr-code {
+            display: none; margin-top: 25px; padding-top: 20px;
+            border-top: 1px solid #eee; flex-direction: column; align-items: center;
+        }
+        .wrapper.active .qr-code { display: flex; animation: fadeIn 0.4s ease-in; }
+        
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+        .qr-code img { width: 200px; background: #fff; padding: 10px; border: 1px solid #eee; border-radius: 10px; }
+        
+        .download-btn {
+            margin-top: 15px; width: 100%; padding: 12px; border: none;
+            border-radius: 10px; color: white; background: #28a745;
+            font-size: 16px; font-weight: 600; cursor: pointer; transition: 0.2s;
+        }
+        .download-btn:active { transform: scale(0.98); }
+        .share-btn { background: #007bff; margin-top: 8px; }
+        
+        /* Hidden canvas used for rendering the image to Base64 */
+        canvas { display: none; }
+    </style>
+</head>
+<body>
+
+    <div class="wrapper">
+        <header>
+            <h1>Smart QR Generator</h1>
+            <p>Enter text or URL to create and download</p>
+        </header>
+        <div class="form">
+            <input type="text" id="qrInput" placeholder="Enter URL or text here..." spellcheck="false">
+            <button id="generateBtn">Generate Code</button>
+        </div>
+        
+        <div class="qr-code">
+            <img id="qrImg" src="" alt="qr-code" crossorigin="anonymous">
+            <button id="downloadBtn" class="download-btn">Save to Device</button>
+            <button id="shareBtn" class="download-btn share-btn">Share Image</button>
+        </div>
+    </div>
+
+    <!-- Canvas for forcing local download -->
+    <canvas id="canvas"></canvas>
+
+    <script>
+        const wrapper = document.querySelector(".wrapper"),
+              qrInput = document.getElementById("qrInput"),
+              generateBtn = document.getElementById("generateBtn"),
+              qrImg = document.getElementById("qrImg"),
+              downloadBtn = document.getElementById("downloadBtn"),
+              shareBtn = document.getElementById("shareBtn"),
+              canvas = document.getElementById("canvas");
+
+        // Generate QR Code
+        generateBtn.addEventListener("click", () => {
+            let qrValue = qrInput.value.trim();
+            if(!qrValue) return alert("Please enter some text first!");
+            
+            generateBtn.innerText = "Generating...";
+            // High resolution (500x500) for better download quality
+            qrImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=500x500&data=${encodeURIComponent(qrValue)}`;
+            
+            qrImg.onload = () => {
+                wrapper.classList.add("active");
+                generateBtn.innerText = "Generate Code";
+            };
+        });
+
+        // Download functionality using Canvas (Base64) to bypass browser restrictions
+        downloadBtn.addEventListener("click", () => {
+            const ctx = canvas.getContext("2d");
+            canvas.width = qrImg.naturalWidth;
+            canvas.height = qrImg.naturalHeight;
+            
+            // Draw image on canvas
+            ctx.drawImage(qrImg, 0, 0);
+            
+            // Convert to Base64 to force download and trigger notification
+            const dataURL = canvas.toDataURL("image/png");
+            
+            const link = document.createElement("a");
+            link.href = dataURL;
+            link.download = "My_QRCode.png"; 
+            document.body.appendChild(link);
+            link.click(); 
+            document.body.removeChild(link);
+            
+            alert("Download started... Check your notifications or Downloads folder.");
+        });
+
+        // Share functionality using Web Share API (Great for modern mobile browsers)
+        shareBtn.addEventListener("click", async () => {
+            try {
+                const response = await fetch(qrImg.src);
+                const blob = await response.blob();
+                const file = new File([blob], "QR_Code.png", { type: "image/png" });
+                
+                if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                    await navigator.share({
+                        files: [file],
+                        title: 'My QR Code',
+                        text: 'Here is the QR code I just generated.'
+                    });
+                } else {
+                    alert("Your browser does not support direct sharing. Please use the Save button.");
+                }
+            } catch (err) {
+                console.error("Share error:", err);
+            }
+        });
+
+        // Hide QR when input is cleared
+        qrInput.addEventListener("keyup", () => {
+            if(!qrInput.value.trim()) wrapper.classList.remove("active");
+        });
+    </script>
+</body>
+</html>
