@@ -2,9 +2,13 @@
 <html lang="en" dir="ltr">
 <head>
     <meta charset="utf-8">
-    <title>Pro QR Code Generator 2026</title>
+    <title>Pro QR Code Generator</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- استدعاء مكتبة توليد الباركود محلياً -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Poppins', sans-serif; }
         body {
@@ -41,7 +45,15 @@
         
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
-        .qr-code img { width: 200px; background: #fff; padding: 10px; border: 1px solid #eee; border-radius: 10px; }
+        /* تنسيق الصورة المولدة محلياً */
+        #qr-container canvas, #qr-container img {
+            margin: 0 auto;
+            background: #fff;
+            padding: 10px;
+            border: 1px solid #eee;
+            border-radius: 10px;
+            width: 200px;
+        }
         
         .download-btn {
             margin-top: 15px; width: 100%; padding: 12px; border: none;
@@ -50,9 +62,6 @@
         }
         .download-btn:active { transform: scale(0.98); }
         .share-btn { background: #007bff; margin-top: 8px; }
-        
-        /* Hidden canvas used for rendering the image to Base64 */
-        canvas { display: none; }
     </style>
 </head>
 <body>
@@ -68,83 +77,85 @@
         </div>
         
         <div class="qr-code">
-            <img id="qrImg" src="" alt="qr-code" crossorigin="anonymous">
+            <!-- سيتم حقن الباركود هنا بواسطة المكتبة -->
+            <div id="qr-container"></div>
+            
             <button id="downloadBtn" class="download-btn">Save to Device</button>
             <button id="shareBtn" class="download-btn share-btn">Share Image</button>
         </div>
     </div>
 
-    <!-- Canvas for forcing local download -->
-    <canvas id="canvas"></canvas>
-
     <script>
         const wrapper = document.querySelector(".wrapper"),
               qrInput = document.getElementById("qrInput"),
               generateBtn = document.getElementById("generateBtn"),
-              qrImg = document.getElementById("qrImg"),
+              qrContainer = document.getElementById("qr-container"),
               downloadBtn = document.getElementById("downloadBtn"),
-              shareBtn = document.getElementById("shareBtn"),
-              canvas = document.getElementById("canvas");
+              shareBtn = document.getElementById("shareBtn");
 
-        // Generate QR Code
+        // توليد الباركود محلياً
         generateBtn.addEventListener("click", () => {
             let qrValue = qrInput.value.trim();
             if(!qrValue) return alert("Please enter some text first!");
             
             generateBtn.innerText = "Generating...";
-            // High resolution (500x500) for better download quality
-            qrImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=500x500&data=${encodeURIComponent(qrValue)}`;
+            qrContainer.innerHTML = ""; // مسح الباركود القديم
             
-            qrImg.onload = () => {
+            // استخدام المكتبة لإنشاء الكود داخل المتصفح (بدون إنترنت)
+            new QRCode(qrContainer, {
+                text: qrValue,
+                width: 300,  // جودة عالية للتحميل
+                height: 300,
+                colorDark : "#000000",
+                colorLight : "#ffffff",
+                correctLevel : QRCode.CorrectLevel.H
+            });
+            
+            setTimeout(() => {
                 wrapper.classList.add("active");
                 generateBtn.innerText = "Generate Code";
-            };
+            }, 300);
         });
 
-        // Download functionality using Canvas (Base64) to bypass browser restrictions
+        // التحميل المباشر للباركود
         downloadBtn.addEventListener("click", () => {
-            const ctx = canvas.getContext("2d");
-            canvas.width = qrImg.naturalWidth;
-            canvas.height = qrImg.naturalHeight;
+            const canvas = qrContainer.querySelector("canvas");
+            if (!canvas) return;
             
-            // Draw image on canvas
-            ctx.drawImage(qrImg, 0, 0);
-            
-            // Convert to Base64 to force download and trigger notification
+            // تحويل الباركود إلى رابط محلي لضمان التحميل
             const dataURL = canvas.toDataURL("image/png");
-            
             const link = document.createElement("a");
             link.href = dataURL;
-            link.download = "My_QRCode.png"; 
+            link.download = "My_QRCode.png";
             document.body.appendChild(link);
-            link.click(); 
+            link.click();
             document.body.removeChild(link);
-            
-            alert("Download started... Check your notifications or Downloads folder.");
         });
 
-        // Share functionality using Web Share API (Great for modern mobile browsers)
-        shareBtn.addEventListener("click", async () => {
-            try {
-                const response = await fetch(qrImg.src);
-                const blob = await response.blob();
+        // المشاركة (تعمل بكفاءة لأن الصورة أصبحت محلية)
+        shareBtn.addEventListener("click", () => {
+            const canvas = qrContainer.querySelector("canvas");
+            if (!canvas) return;
+
+            canvas.toBlob(async (blob) => {
                 const file = new File([blob], "QR_Code.png", { type: "image/png" });
-                
                 if (navigator.canShare && navigator.canShare({ files: [file] })) {
-                    await navigator.share({
-                        files: [file],
-                        title: 'My QR Code',
-                        text: 'Here is the QR code I just generated.'
-                    });
+                    try {
+                        await navigator.share({
+                            files: [file],
+                            title: 'My QR Code',
+                            text: 'Here is the QR code I just generated.'
+                        });
+                    } catch (err) {
+                        console.error("Share error:", err);
+                    }
                 } else {
                     alert("Your browser does not support direct sharing. Please use the Save button.");
                 }
-            } catch (err) {
-                console.error("Share error:", err);
-            }
+            });
         });
 
-        // Hide QR when input is cleared
+        // إخفاء الصندوق عند مسح النص
         qrInput.addEventListener("keyup", () => {
             if(!qrInput.value.trim()) wrapper.classList.remove("active");
         });
